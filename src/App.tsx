@@ -262,6 +262,9 @@ function App() {
                         width={window.innerWidth}
                         fill="#ffffff"
                         id="bg"
+                        onClick={() => {
+                            transformerRef.current.nodes([]);
+                        }}
                     />
                     {
                         rectangles.map((rectangle) => (

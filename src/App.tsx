@@ -17,15 +17,21 @@ import {useRef, useState} from "react";
 import Konva from "konva";
 import {ACTIONS} from "./constants";
 import {v4 as uuidv4} from "uuid";
+import CustomShape from "./Shape.tsx";
+import {useShapeStore} from "./store/shapeStore.ts";
+import {Shape} from "./type/Shape.ts";
 
 function App() {
 
     const stageRef = useRef(null);
     const [action, setAction] = useState(ACTIONS.SELECT);
     const [fillColor, setFillColor] = useState("#ff0000");
-    const [rectangles, setRectangles] = useState([]);
-    const [circles, setCircles] = useState([]);
+
     const [arrows, setArrows] = useState([]);
+
+    const shapes = useShapeStore(state => state.shapes);
+    const updateShapes = useShapeStore(state => state.updateShapes);
+
     const [scribbles, setScribbles] = useState([]);
     const strokeColor = "#000";
 
@@ -33,6 +39,10 @@ function App() {
     const isPaining = useRef(false);
     const currentShapeId = useRef();
     const transformerRef = useRef(null);
+
+    const [textSelectedShape, setTextSelectedShape] = useState('');
+
+    console.log(shapes)
     const onPointerMove = (e: Konva.KonvaEventObject<PointerEvent>) => {
         if (action === ACTIONS.SELECT || !isPaining.current) return;
 
@@ -41,31 +51,32 @@ function App() {
 
         switch (action) {
             case ACTIONS.RECTANGLE:
-                setRectangles((rectangles) =>
-                    rectangles.map((rectangle) => {
-                        if (rectangle.id === currentShapeId.current) {
-                            return {
-                                ...rectangle,
-                                width: x - rectangle.x,
-                                height: y - rectangle.y,
-                            };
-                        }
-                        return rectangle;
-                    })
-                );
+                const updatedShapes: Shape[] = shapes.map((rectangle) => {
+                    if (rectangle.id === currentShapeId.current) {
+                        return {
+                            ...rectangle,
+                            width: x - rectangle.x,
+                            height: y - rectangle.y,
+                        };
+                    }
+                    return rectangle;
+                });
+
+                updateShapes(updatedShapes)
+
+
                 break;
             case ACTIONS.CIRCLE:
-                setCircles((circles) =>
-                    circles.map((circle) => {
-                        if (circle.id === currentShapeId.current) {
-                            return {
-                                ...circle,
-                                radius: ((y - circle.y) ** 2 + (x - circle.x) ** 2) ** 0.5,
-                            };
-                        }
-                        return circle;
-                    })
-                );
+                const updatedCircles: Shape[] = shapes.map((circle) => {
+                    if (circle.id === currentShapeId.current) {
+                        return {
+                            ...circle,
+                            radius: ((y - circle.y) ** 2 + (x - circle.x) ** 2) ** 0.5,
+                        };
+                    }
+                    return circle;
+                })
+                updateShapes(updatedCircles)
                 break;
             case ACTIONS.ARROW:
                 setArrows((arrows) =>
@@ -103,35 +114,43 @@ function App() {
         const stage = stageRef.current;
         const {x, y} = stage.getPointerPosition();
         const id = uuidv4();
+        let updatedShapes: Shape[] = shapes
 
         currentShapeId.current = id;
         isPaining.current = true;
 
         switch (action) {
             case ACTIONS.RECTANGLE:
-                setRectangles((rectangles) => [
-                    ...rectangles,
-                    {
-                        id,
-                        x,
-                        y,
-                        height: 0,
-                        width: 0,
-                        fillColor,
-                    },
-                ]);
+
+                updatedShapes.push({
+                    id,
+                    x,
+                    y,
+                    fill: fillColor,
+                    draggable: true,
+                    rotation: 0,
+                    width: 0,
+                    height: 0,
+                    type: 'rect',
+                    text: 'double click to write text'
+                })
+                updateShapes(updatedShapes)
                 break;
             case ACTIONS.CIRCLE:
-                setCircles((circles) => [
-                    ...circles,
+                updatedShapes.push(
                     {
                         id,
                         x,
                         y,
                         radius: 20,
-                        fillColor,
-                    },
-                ]);
+                        draggable: true,
+                        type: 'circle',
+                        fill: fillColor,
+                        rotation: 0,
+                        text: 'double click to write text'
+                    }
+                )
+                updateShapes(updatedShapes)
                 break;
             case ACTIONS.ARROW:
                 setArrows((arrows) => [
@@ -178,6 +197,7 @@ function App() {
 
     return (
         <div className="relative w-full h-screen overflow-hidden">
+
             <div className="absolute top-0 z-10 w-full py-2">
                 <div
                     className="flex justify-center items-center gap-3 py-2 px-3 w-fit mx-auto border shadow-lg rounded-lg">
@@ -246,6 +266,7 @@ function App() {
                     </button>
                 </div>
             </div>
+
             <Stage
                 ref={stageRef}
                 width={window.innerWidth}
@@ -264,39 +285,50 @@ function App() {
                         id="bg"
                         onClick={() => {
                             transformerRef.current.nodes([]);
+                            setTextSelectedShape('')
                         }}
                     />
                     {
-                        rectangles.map((rectangle) => (
-                            <Rect
-                                key={rectangle.id}
-                                x={rectangle.x}
-                                y={rectangle.y}
-                                stroke={strokeColor}
-                                strokeWidth={2}
-                                fill={rectangle.fillColor}
-                                height={rectangle.height}
-                                width={rectangle.width}
-                                draggable={isDraggable}
+                        shapes.map((shape) => (
+                            <CustomShape
+                                onDoubleClick={() => setTextSelectedShape(shape.id)}
+                                shape={shape}
                                 onClick={onClick}
                             />
                         ))
                     }
-                    {
-                        circles.map((circle) => (
-                            <Circle
-                                key={circle.id}
-                                radius={circle.radius}
-                                x={circle.x}
-                                y={circle.y}
-                                stroke={strokeColor}
-                                strokeWidth={2}
-                                fill={circle.fillColor}
-                                draggable={isDraggable}
-                                onClick={onClick}
-                            />
-                        ))
-                    }
+
+                    {/*{*/}
+                    {/*    rectangles.map((rectangle) => (*/}
+                    {/*        <Rect*/}
+                    {/*            key={rectangle.id}*/}
+                    {/*            x={rectangle.x}*/}
+                    {/*            y={rectangle.y}*/}
+                    {/*            stroke={strokeColor}*/}
+                    {/*            strokeWidth={2}*/}
+                    {/*            fill={rectangle.fillColor}*/}
+                    {/*            height={rectangle.height}*/}
+                    {/*            width={rectangle.width}*/}
+                    {/*            draggable={isDraggable}*/}
+                    {/*            onClick={onClick}*/}
+                    {/*        />*/}
+                    {/*    ))*/}
+                    {/*}*/}
+                    {/*{*/}
+                    {/*    circles.map((circle) => (*/}
+                    {/*        <Circle*/}
+                    {/*            key={circle.id}*/}
+                    {/*            radius={circle.radius}*/}
+                    {/*            x={circle.x}*/}
+                    {/*            y={circle.y}*/}
+                    {/*            stroke={strokeColor}*/}
+                    {/*            strokeWidth={2}*/}
+                    {/*            fill={circle.fillColor}*/}
+                    {/*            draggable={isDraggable}*/}
+                    {/*            onClick={onClick}*/}
+                    {/*        />*/}
+                    {/*    ))*/}
+                    {/*}*/}
                     {
                         arrows.map((arrow) => (
                             <Arrow
@@ -327,10 +359,7 @@ function App() {
                     }
                     <Transformer ref={transformerRef}/>
                 </Layer>
-
             </Stage>
-
-
         </div>
     )
 }
